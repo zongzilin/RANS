@@ -12,7 +12,7 @@ U_in = 60;
 n = 4;
 x = 8;
 hx = x/2^n; nhx = x/hx + 2;
-hy = 0.1/2^n; nhy = 0.1/hy + 2;
+hy = 0.1/2^(n); nhy = 0.1/hy + 2;
 dt = 0.00001;
 
 [XX,YY] = meshgrid(0-hx/2:hx:4+hx/2,0-hy/2:hy:0.1+hy/2);
@@ -66,34 +66,36 @@ resid_show = [];
 while  U_change > U_change_max
     n_count=n_count+1;
     
-    for i = 2:nhx-1
-        for j = 2:nhy - 1
+    for i = 2:nhy-1
+        for j = 2:nhx - 1
             delY_u(i,j) = (Unew(i+1,j)-Unew(i-1,j))/(2*hy);
         end
     end
     
-    delY_u(nhx,:) = 0;
-    delY_u(1,2:nhy-1) = 0;
-    delY_u(2:nhx,1) = -delY_u(2:nhx,2);
-    delY_u(2:nhx,nhy) = -delY_u(2:nhx,nhy-1);
+    delY_u(nhy,:) = 0;
+    delY_u(1,2:nhx-1) = 0;
+    delY_u(2:nhy,1) = -delY_u(2:nhy,2);
+    delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1);
     
+    l_mixM = repmat(l_mix,1,18);
+    tempM = l_mixM.^2.*abs(delY_u).*delY_u;
     temp = l_mix.^2.*abs(delY_u).*delY_u;
     
-    for i = 2:nhx - 1
-        for j = 2:nhy - 1
+    for i = 2:nhy - 1
+        for j = 2:nhx - 1
             delYY_u(i,j) = (temp(i+1,j)-temp(i-1,j))/(2*hy);
         end
     end
   
-    for i = 2:nhx-1
-        for j = 2:nhy-1
+    for i = 2:nhy-1
+        for j = 2:nhx-1
             delYX_u(i,j) = (temp(i,j+1)-temp(i,j-1))/(2*hx);
         end
     end
     
     % U velocity 
-    for i=2:nhx-1
-        for j=2:nhy-1
+    for i=2:nhy-1
+        for j=2:nhx-1
             Unew(i,j)= (1-w)*U(i,j)+w*(U(i,j)-dt*(P(i+1,j)-P(i-1,j))/(2*hx)...
                 +nu*dt*(1/(hx*hx)*(U(i+1,j)-2.*U(i,j)+U(i-1,j))...
                 +1/(hy*hy)*(U(i,j+1)-2.*U(i,j)+U(i,j-1)))...
@@ -103,15 +105,15 @@ while  U_change > U_change_max
     end
     
     % Update Boundary Condition 
-    Unew(nhx,:)=Unew(nhx-1,:);
-    Unew(1,2:nhy-1)=-Unew(2,2:nhy-1)+2*U_in;
-    Unew(2:nhx,1)=-Unew(2:nhx,2);
-    Unew(2:nhx,nhy)=-Unew(2:nhx,nhy-1);
+    Unew(nhy,:)=Unew(nhy-1,:);
+    Unew(1,2:nhx-1)=-Unew(2,2:nhx-1)+2*U_in;
+    Unew(2:nhy,1)=-Unew(2:nhy,2);
+    Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
     U_change=max(max(abs((Unew-U)/dt)));
     
     % V velocity 
-    for i=2:nhx-1
-        for j=2:nhy-1
+    for i=2:nhy-1
+        for j=2:nhx-1
             Vnew(i,j)= (1-w)*V(i,j)+w*(V(i,j)-dt*(P(i,j+1)-P(i,j-1))/(2*hy)...
                 +nu*dt*(1/(hx*hx)*(V(i+1,j)-2.*V(i,j)+V(i-1,j))...
                 +1/(hy*hy)*(V(i,j+1)-2.*V(i,j)+V(i,j-1)))...
@@ -121,14 +123,14 @@ while  U_change > U_change_max
     end
     
     % Update Boundary Condition  
-    Vnew(nhx,:)=Vnew(nhx-1,:);
+    Vnew(nhy,:)=Vnew(nhy-1,:);
     Vnew(1,:)=-Vnew(2,:);
     Vnew(:,1)=-Vnew(:,2);
-    Vnew(:,nhy)=-Vnew(:,nhy-1);
+    Vnew(:,nhx)=-Vnew(:,nhx-1);
     
     % Divergent term for continuity
-    for i=2:nhx-1
-        for j=2:nhy-1
+    for i=2:nhy-1
+        for j=2:nhx-1
             div(i,j)=(Unew(i+1,j)-Unew(i-1,j))/(2*hx)...
                 +(Vnew(i,j+1)-Vnew(i,j-1))/(2*hy);
         end
@@ -144,8 +146,8 @@ while  U_change > U_change_max
     
   while resid_pc > resid_pc_max & p_count < 100;
     p_count=p_count+1;
-    for i=2:nhx-1
-      for j=2:nhy-1
+    for i=2:nhy-1
+      for j=2:nhx-1
         residual(i,j)= -1/(hx*hx)*(Pc(i+1,j)-2.*Pc(i,j)+Pc(i-1,j))...
                        -1/(hy*hy)*(Pc(i,j+1)-2.*Pc(i,j)+Pc(i,j-1))...
                        +(1./dt)*div(i,j);
@@ -154,8 +156,8 @@ while  U_change > U_change_max
     end
     Pc(1,:)=Pc(2,:);
     Pc(:,1)=Pc(:,2);
-    Pc(:,nhy)=Pc(:,nhy-1);
-    Pc(nhx,:)=0;
+    Pc(:,nhx)=Pc(:,nhx-1);
+    Pc(nhy,:)=0;
 
     resid_pc=sum(sum(abs(residual)))/((nhx-2)*(nhy-2));
 
@@ -165,39 +167,31 @@ while  U_change > U_change_max
     P=P+Pc;
     
     % New corrected velocities
-    for i=2:nhx-1
-        for j=2:nhy-1
+    for i=2:nhy-1
+        for j=2:nhx-1
             Unew(i,j)= Unew(i,j)-dt*(Pc(i+1,j)-Pc(i-1,j))/(2*hx);
             Vnew(i,j)= Vnew(i,j)-dt*(Pc(i,j+1)-Pc(i,j-1))/(2*hy);
         end
     end
     
     % Velocity boundary condition 
-    Unew(nhx,:)=Unew(nhx-1,:);
-    Unew(1,2:nhy-1)=-Unew(2,2:nhy-1)+2*U_in;
-    Unew(2:nhx,1)=-Unew(2:nhx,2);
-    Unew(2:nhx,nhy)=-Unew(2:nhx,nhy-1);
+    Unew(nhy,:)=Unew(nhy-1,:);
+    Unew(1,2:nhx-1)=-Unew(2,2:nhx-1)+2*U_in;
+    Unew(2:nhy,1)=-Unew(2:nhy,2);
+    Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
     
-    Vnew(nhx,:)=Vnew(nhx-1,:);
+    Vnew(nhy,:)=Vnew(nhy-1,:);
     Vnew(1,:)=-Vnew(2,:);
     Vnew(:,1)=-Vnew(:,2);
-    Vnew(:,nhy)=-Vnew(:,nhy-1);
+    Vnew(:,nhx)=-Vnew(:,nhx-1);
     
     U=Unew;
     V=Vnew;
     
     
     resid_show(n_count) = U_change;
-    
-%     Vvec = sqrt(U(2:end-1,2:end-1)'.^2 + V(2:end-1,2:end-1).^2);
-    
-    %quiver(XX,YY,U(2:end-1,2:end-1),V(2:end-1,2:end-1),'Markersize',2,'MaxHeadsize',0.1,'Autoscalefactor',0.5);
-    figure(1)
-    contourf(U','linestyle','none')
-    colorbar;
-    %pause(0.2);
-%     figure(2)
-%      semilogy(resid_show)
+
+     semilogy(resid_show)
      pause(0.01);
 end
 
