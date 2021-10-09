@@ -35,11 +35,13 @@ PROGRAM serial
     INTEGER :: UNIT 
     CHARACTER(LEN = 80) :: filename 
 
+    
+
     ! INITIALISE value 
     ! ###########################  USE SUBROUTINE !!!!!! ###########################!
     rho = 1
     nu = 0.001
-    U_in = 60
+    U_in = 60.0
 
     n = 4 
     x = 8 ! Domain length
@@ -48,7 +50,7 @@ PROGRAM serial
     hy = y/2**n 
     nhx = NINT(x/hx) + 2
     nhy = NINT(y/hy) + 2
-    dt = 0.00001 ! may work for bigger dt 
+    dt = 0.00001! may work for bigger dt 
 
     ALLOCATE(U(nhy,nhx))
     ALLOCATE(Unew(nhy,nhx))
@@ -77,11 +79,15 @@ PROGRAM serial
     delY_u = 0.0
     delYY_u = 0.0
     delYX_u = 0.0
+    P = 0.0
+    P(:,1) = 1.0
+    Pc = P 
 
     U_change = 1
     U_change_max = 1e-4
     resid_pc = 1
     resid_pc_max = 1e-4
+
 
     w = 1.9
     relx_pc = 1.5
@@ -131,6 +137,8 @@ PROGRAM serial
             end DO 
         end DO
 
+
+
         ! Update Boundary Condtion
         Unew(nhy,:)=Unew(nhy-1,:);
         Unew(1,2:nhx-1)=-Unew(2,2:nhx-1)+2*U_in;
@@ -138,11 +146,13 @@ PROGRAM serial
         Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
         U_change= MAXVAL(ABS((Unew-U)/dt))
 
+        
+
         ! V - Velocity solve
         DO i = 2,nhy - 1
             DO j = 2,nhx - 1
                 Vnew(i,j)= (1-w)*V(i,j)+w*(V(i,j)-dt*(P(i,j+1)-P(i,j-1))/(2*hy) &
-                +nu*dt*(1/(hx*hx)*(V(i+1,j)-2.*V(i,j)+V(i-1,j)) &
+                +nu*dt*(1/(hx*hx)*(V(i+1,j)-2*V(i,j)+V(i-1,j)) &
                 +1/(hy*hy)*(V(i,j+1)-2.*V(i,j)+V(i,j-1))) &
                 -dt*U(i,j)/(hx)*(V(i,j)-V(i-1,j)) &
                 -dt*V(i,j)/(2*hy)*(V(i,j+1)-V(i,j-1))+dt*delYX_u(i,j))
@@ -213,7 +223,11 @@ PROGRAM serial
         U=Unew;
         V=Vnew;
 
-        if (mod(n_count,50) == 0) write(*,*) U_change
+        if (mod(n_count,50) == 0) then
+            WRITE(*,'(a40)') '-----------------------------------------'
+            WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count 
+            WRITE(*,'(a20,E20.6)') '# Current Delta U = ', U_change
+        end IF
         
 
     end DO
@@ -241,6 +255,6 @@ PROGRAM serial
         WRITE(UNIT,*) P 
     CLOSE(UNIT)
 
-
+    write(*,*) maxval(U)
 
 END PROGRAM serial 
