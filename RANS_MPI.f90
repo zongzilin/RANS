@@ -26,7 +26,7 @@ PROGRAM RANS_MPI
     REAL(KIND = 8), ALLOCATABLE :: delY_u(:,:), delYY_u(:,:), delYX_u(:,:),ml(:,:), tmp(:,:)
 
     ! Iteration/relaxation factor
-    INTEGER :: n_count, p_count, i, j, k, ii 
+    INTEGER :: n_count, p_count, i, j, k, ii, jj 
     REAL(KIND = 8) :: w, relx_pc
 
     ! Error/ Steady state criteria
@@ -41,7 +41,17 @@ PROGRAM RANS_MPI
     INTEGER :: UNIT 
     CHARACTER(LEN = 80) :: filename 
 
+    ! MPI cart decompose
+    INTEGER :: dims(0:1)
+
     ! MPI initialise 
+    LOGICAL :: reorder, periods(0:1)
+    INTEGER :: cart_comm
+    INTEGER, PARAMETER :: DOWNc = 0
+    INTEGER, PARAMETER :: UPc = 1
+    INTEGER, PARAMETER :: LEFTc = 2
+    INTEGER, PARAMETER :: RIGHTc = 3
+    INTEGER :: neighbours_ranks(0:3)
     INTEGER :: ierr, pid, np, tag 
     INTEGER(KIND = 4) :: stat(MPI_STATUS_SIZE, 8), istat(MPI_STATUS_SIZE)
     INTEGER :: left, right, req(8)
@@ -117,7 +127,20 @@ PROGRAM RANS_MPI
     w = 1.9
     relx_pc = 1.5
 
-    !##########################################################################!
+    !################### TURN THIS INTO SUBROUNTINE call it mpicart #################################!
+    dims = (/0,0/)
+    CALL MPI_Dims_create(np, 1, dims, ierr)
+
+    ! Creates communicator on cartesian topology
+    reorder = .TRUE.
+    periods = (/.FALSE., .FALSE./)
+    CALL MPI_Cart_create(MPI_COMM_WORLD, 1, dims, periods, reorder, cart_comm, ierr)
+
+    CALL MPI_Cart_shift(cart_comm, 1, 1, neighbours_ranks(LEFTc), neighbours_ranks(RIGHTc), ierr)
+
+    !write(*,*) 'this is PID', PID, 'with right neighour', neighbours_ranks(3), ' and left neighour ',neighbours_ranks(2)
+
+    !##############################################################################################!
 
     CALL mxlen(nhx,nhy,y,meshY,ml) ! Mixing length uniform for all PID 
 
@@ -136,7 +159,10 @@ PROGRAM RANS_MPI
          delY_u(2:nhy,1) = -delY_u(2:nhy,2)
          delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
 
-        call sendTo(PID,np,left,right)
+        call sendTo(PID,np,left,right) ! SHOULD CHANGE TO MPI CART SHIFT
+
+        left = neighbours_ranks(2)
+        right = neighbours_ranks(3)
 
         CALL MPI_iRecv(delY_u(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(2),ierr)
         CALL MPI_iSend(delY_u(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(1),ierr)
@@ -160,7 +186,7 @@ PROGRAM RANS_MPI
 
         CALL MPI_waitall(4,req,stat,ierr)
 
-        if(PID == 0) write(*,*) delYY_u(:,2)
+  
 
         DO i = 2,nhy - 1
             DO j = ll,lh
@@ -195,15 +221,12 @@ PROGRAM RANS_MPI
         Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
         U_change= MAXVAL(ABS((Unew-U)/dt)) ! MPI_Allreduce?
 
-
         CALL MPI_iRecv(Unew(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(2),ierr)
         CALL MPI_iSend(Unew(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(1),ierr)
         CALL MPI_iRecv(Unew(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(4),ierr)
         CALL MPI_iSend(Unew(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(3),ierr)
 
         CALL MPI_waitall(4,req,stat,ierr)
-
-        
 
         ! V - Velocity solve
         DO i = 2,nhy - 1
@@ -229,7 +252,6 @@ PROGRAM RANS_MPI
 
         CALL MPI_waitall(4,req,stat,ierr)
 
-
         ! Divergence solve
         DO i = 2,nhy - 1
             DO j = ll,lh 
@@ -238,6 +260,15 @@ PROGRAM RANS_MPI
             end DO 
         end DO
 
+        CALL MPI_iRecv(div(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(2),ierr)
+        CALL MPI_iSend(div(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(1),ierr)
+        CALL MPI_iRecv(div(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(4),ierr)
+        CALL MPI_iSend(div(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(3),ierr)
+
+        CALL MPI_waitall(4,req,stat,ierr)
+
+        if(PID == 0) write(*,*) div(:,2)
+
         div_sum = sum(abs(div))/((nhx-2)*(nhy-2))
 
 
@@ -245,27 +276,37 @@ PROGRAM RANS_MPI
         p_count = 0 
         Pc = 0.0
 
-        DO WHILE ((resid_pc .GT. resid_pc_max) .AND. (p_count .LT. 100)) 
+        !DO WHILE ((resid_pc .GT. resid_pc_max) .AND. (p_count .LT. 100)) 
+        DO jj = 1,1
             p_count = p_count + 1
             DO i = 2,nhy - 1
                 DO j = ll,lh
                     residual(i,j) = -1/(hx*hx)*(Pc(i+1,j)-2.*Pc(i,j)+Pc(i-1,j)) &
-                    -1/(hy*hy)*(Pc(i,j+1)-2.*Pc(i,j)+Pc(i,j-1)) &
-                    +(1./dt)*div(i,j)
-
-                    Pc(i,j) = (1/(-2/(hx*hx)-2/(hy*hy))*residual(i,j))*relx_pc+Pc(i,j)
+                                    -1/(hy*hy)*(Pc(i,j+1)-2.*Pc(i,j)+Pc(i,j-1)) &
+                                    +(1./dt)*div(i,j)
                 end DO
             end DO
-        
 
-        Pc(1,:)=Pc(2,:);
-        Pc(:,1)=Pc(:,2);
-        Pc(:,nhx)=Pc(:,nhx-1);
-        Pc(nhy,:)=0;
-        
-        resid_pc = sum(abs(residual))/((nhx-2)*(nhy-2))
+            CALL MPI_iRecv(div(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(2),ierr)
+            CALL MPI_iSend(div(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,MPI_COMM_WORLD,req(1),ierr)
+            CALL MPI_iRecv(div(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(4),ierr)
+            CALL MPI_iSend(div(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,MPI_COMM_WORLD,req(3),ierr)
+    
+            CALL MPI_waitall(4,req,stat,ierr)
 
-      end DO
+            
+        
+            Pc(1,:)=Pc(2,:);
+            Pc(:,1)=Pc(:,2);
+            Pc(:,nhx)=Pc(:,nhx-1);
+            Pc(nhy,:)=0;
+            
+            resid_pc = sum(abs(residual))/((nhx-2)*(nhy-2))
+
+            !if (PID == 1) write(*,*) residual(:,ll)
+
+        end DO
+
 
         ! Update Pressure
         P = P + Pc 
@@ -291,11 +332,11 @@ PROGRAM RANS_MPI
         U=Unew;
         V=Vnew;
 
-        if (PID == 0) then 
-                WRITE(*,'(a40)') '-----------------------------------------'
-                WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count 
-                WRITE(*,'(a20,E20.6)') '# Current Delta U = ', U_change
-        end if 
+        ! if (PID == 0) then 
+        !         WRITE(*,'(a40)') '-----------------------------------------'
+        !         WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count 
+        !         WRITE(*,'(a20,E20.6)') '# Current Delta U = ', U_change
+        ! end if 
         
 
     end DO
