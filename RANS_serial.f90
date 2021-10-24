@@ -39,59 +39,10 @@ PROGRAM serial
 
     ! INITIALISE value 
     ! ###########################  USE SUBROUTINE !!!!!! ###########################!
-    rho = 1
-    nu = 0.001
-    U_in = 60.0
-
-    n = 4 
-    x = 8 ! Domain length
-    y = 0.1
-    hx = x/2**n 
-    hy = y/2**n 
-    nhx = NINT(x/hx) + 2
-    nhy = NINT(y/hy) + 2
-    dt = 0.00001! may work for bigger dt 
-
-    ALLOCATE(U(nhy,nhx))
-    ALLOCATE(Unew(nhy,nhx))
-    ALLOCATE(V(nhy,nhx))
-    ALLOCATE(Vnew(nhy,nhx))
-    ALLOCATE(P(nhy,nhx))
-    ALLOCATE(Pc(nhy,nhx))
-    ALLOCATE(residual(nhy,nhx))
-    ALLOCATE(div(nhy,nhx))
-    ALLOCATE(meshY(nhy))
-    ALLOCATE(delY_u(nhy,nhx))
-    ALLOCATE(delYY_u(nhy,nhx))
-    ALLOCATE(delYX_u(nhy,nhx))
-    ALLOCATE(ml(nhy,nhx))
-    ALLOCATE(tmp(nhy,nhx))
-
-    CALL linspace(-hy/2,0.1+hy/2,hy,meshY)
-
-    U = 0.0
-    U(2:nhy - 1,1:2) = U_in 
-    Unew = U
-    V = 0.0
-    Vnew = V 
-    residual = 0.0 
-    div = 0.0
-    delY_u = 0.0
-    delYY_u = 0.0
-    delYX_u = 0.0
-    P = 0.0
-    P(:,1) = 1.0
-    Pc = P 
-
-    U_change = 1
-    U_change_max = 1e-4
-    resid_pc = 1
-    resid_pc_max = 1e-4
-
-
-    w = 1.9
-    relx_pc = 1.5
-
+	CALL valInit()
+	
+	
+	
     !##########################################################################!
 
     CALL mxlen(nhx,nhy,y,meshY,ml)
@@ -101,29 +52,7 @@ PROGRAM serial
         n_count = n_count + 1
 
         ! ############## MADE THIS SECTION A SUBROUNTINE (CALL IT eddy_visc) ############################!
-        DO i = 2,nhy - 1
-            DO j = 2,nhx - 1
-            delY_u(i,j) = (Unew(i+1,j)-Unew(i-1,j))/(2*hy)
-            end DO 
-        end DO
-        delY_u(nhy,:) = 0
-        delY_u(1,2:nhx-1) = 0
-        delY_u(2:nhy,1) = -delY_u(2:nhy,2)
-        delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
-
-        tmp = ml**2*ABS(delY_u)*delY_u
-
-        DO i = 2,nhy - 1
-            DO j = 2,nhx - 1
-                delYY_u(i,j) = (tmp(i+1,j)-tmp(i-1,j))/(2*hy);
-            end DO
-        end DO
-
-        DO i = 2,nhy - 1
-            DO j = 2,nhx - 1
-                delYX_u(i,j) = (tmp(i,j+1)-tmp(i,j-1))/(2*hx);
-            end DO
-        end DO
+    CALL eddy_visc(Unew,delY_u,ml,delYY_u,delYX_u)
         !############################################################################################!
 
         ! U - Velocity solve
@@ -256,5 +185,97 @@ PROGRAM serial
     CLOSE(UNIT)
 
     write(*,*) maxval(U)
+Contains
+SUBROUTINE AllocateMemory()
+	IMPLICIT NONE
+	
+    ALLOCATE(U(nhy,nhx))
+    ALLOCATE(Unew(nhy,nhx))
+    ALLOCATE(V(nhy,nhx))
+    ALLOCATE(Vnew(nhy,nhx))
+    ALLOCATE(P(nhy,nhx))
+    ALLOCATE(Pc(nhy,nhx))
+    ALLOCATE(residual(nhy,nhx))
+    ALLOCATE(div(nhy,nhx))
+    ALLOCATE(meshY(nhy))
+    ALLOCATE(delY_u(nhy,nhx))
+    ALLOCATE(delYY_u(nhy,nhx))
+    ALLOCATE(delYX_u(nhy,nhx))
+    ALLOCATE(ml(nhy,nhx))
+    ALLOCATE(tmp(nhy,nhx))
+	 
+END SUBROUTINE AllocateMemory
+	
+SUBROUTINE valInit()
+IMPLICIT NONE
+rho = 1
+    nu = 0.001
+    U_in = 60.0
+
+    n = 4 
+    x = 8 ! Domain length
+    y = 0.1
+    hx = x/2**n 
+    hy = y/2**n 
+    nhx = NINT(x/hx) + 2
+    nhy = NINT(y/hy) + 2
+    dt = 0.00001! may work for bigger dt 
+	CALL AllocateMemory()
+	CALL linspace(-hy/2,0.1+hy/2,hy,meshY)
+	
+	U = 0.0
+    U(2:nhy - 1,1:2) = U_in 
+    Unew = U
+    V = 0.0
+    Vnew = V 
+    residual = 0.0 
+    div = 0.0
+    delY_u = 0.0
+    delYY_u = 0.0
+    delYX_u = 0.0
+    P = 0.0
+    P(:,1) = 1.0
+    Pc = P 
+
+    U_change = 1
+    U_change_max = 1e-4
+    resid_pc = 1
+    resid_pc_max = 1e-4
+
+
+    w = 1.9
+    relx_pc = 1.5	
+END SUBROUTINE valInit		
+SUBROUTINE eddy_visc(Unew,delY_u,ml,delYY_u,delYX_u)
+	IMPLICIT NONE
+	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(IN) :: Unew,ml
+	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
+	INTEGER :: i,j
+	 DO i = 2,nhy - 1
+            DO j = 2,nhx - 1
+            delY_u(i,j) = (Unew(i+1,j)-Unew(i-1,j))/(2*hy)
+            end DO 
+        end DO
+        delY_u(nhy,:) = 0
+        delY_u(1,2:nhx-1) = 0
+        delY_u(2:nhy,1) = -delY_u(2:nhy,2)
+        delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
+
+        tmp = ml**2*ABS(delY_u)*delY_u
+
+        DO i = 2,nhy - 1
+            DO j = 2,nhx - 1
+                delYY_u(i,j) = (tmp(i+1,j)-tmp(i-1,j))/(2*hy);
+            end DO
+        end DO
+
+        DO i = 2,nhy - 1
+            DO j = 2,nhx - 1
+                delYX_u(i,j) = (tmp(i,j+1)-tmp(i,j-1))/(2*hx);
+            end DO
+        end DO
+END SUBROUTINE eddy_visc
+
+
 
 END PROGRAM serial 
