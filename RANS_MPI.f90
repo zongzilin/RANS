@@ -153,11 +153,8 @@ PROGRAM RANS_MPI
          delY_u(1,2:nhx-1) = 0
          delY_u(2:nhy,1) = -delY_u(2:nhy,2)
          delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
-     
-        CALL MPI_iRecv(delY_u(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(delY_u(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(delY_u(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(delY_u(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -167,10 +164,8 @@ PROGRAM RANS_MPI
                 tmp(i,j) = ml(i,j)**2*ABS(delY_u(i,j))*delY_u(i,j)
             end DO
         end DO
-        CALL MPI_iRecv(tmp(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(tmp(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(tmp(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(tmp(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(tmp,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -180,10 +175,8 @@ PROGRAM RANS_MPI
             end DO
         end DO
 
-        CALL MPI_iRecv(delYY_u(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(delYY_u(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(delYY_u(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(delYY_u(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delYY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -193,10 +186,8 @@ PROGRAM RANS_MPI
             end DO
         end DO
 
-        CALL MPI_iRecv(delYX_u(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(delYX_u(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(delYX_u(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(delYX_u(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delYX_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -226,10 +217,8 @@ PROGRAM RANS_MPI
 
         CALL MPI_Allreduce(U_change, U_change, 1, MPI_DOUBLE_PRECISION, MPI_SUM, cart_comm, ierr)
 
-        CALL MPI_iRecv(Unew(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(Unew(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(Unew(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(Unew(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(Unew,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -250,10 +239,8 @@ PROGRAM RANS_MPI
         Vnew(:,1)=-Vnew(:,2);
         Vnew(:,nhx)=-Vnew(:,nhx-1);
 
-        CALL MPI_iRecv(Vnew(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(Vnew(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(Vnew(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(Vnew(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(Vnew,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -265,10 +252,9 @@ PROGRAM RANS_MPI
             end DO 
         end DO
 
-        CALL MPI_iRecv(div(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(div(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(div(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(div(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(div,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)     
+
 
         CALL MPI_waitall(4,req,stat,ierr)
 
@@ -357,17 +343,13 @@ PROGRAM RANS_MPI
         U=Unew;
         V=Vnew;
 
-        CALL MPI_iRecv(Unew(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(Unew(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(Unew(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(Unew(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(Unew,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
     
         CALL MPI_waitall(4,req,stat,ierr)
     
-        CALL MPI_iRecv(Vnew(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-        CALL MPI_iSend(Vnew(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-        CALL MPI_iRecv(Vnew(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-        CALL MPI_iSend(Vnew(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+	    ! MPI send and recv
+		CALL MPI_SEND_RECV(Vnew,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
     
         CALL MPI_waitall(4,req,stat,ierr)  
 
