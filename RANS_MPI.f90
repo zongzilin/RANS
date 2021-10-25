@@ -69,7 +69,7 @@ PROGRAM RANS_MPI
     nu = 0.001
     U_in = 60.0
 
-    n = 5 
+    n = 4 
     x = 8 ! Domain length
     y = 0.1
     hx = x/2**n 
@@ -213,7 +213,7 @@ PROGRAM RANS_MPI
         Unew(1,2:nhx-1)=-Unew(2,2:nhx-1)+2*U_in;
         Unew(2:nhy,1)=-Unew(2:nhy,2);
         Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
-        U_change= MAXVAL(ABS((Unew-U)/dt)) ! MPI_Allreduce?
+        U_change= MAXVAL(ABS((Unew(:,ll:lh)-U(:,ll:lh))/dt)) ! MPI_Allreduce?
 
         CALL MPI_Allreduce(U_change, U_change, 1, MPI_DOUBLE_PRECISION, MPI_SUM, cart_comm, ierr)
 
@@ -296,23 +296,6 @@ PROGRAM RANS_MPI
                 Pc(:,1)=Pc(:,2)
                 Pc(:,nhx)=Pc(:,nhx-1)
                 Pc(nhy,:)=0
-
-            ! CALL MPI_iRecv(Pc(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-            ! CALL MPI_iSend(Pc(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-            ! CALL MPI_iRecv(Pc(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-            ! CALL MPI_iSend(Pc(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
-            
-            ! CALL MPI_waitall(4,req,stat,ierr)
-
-            ! CALL MPI_iRecv(residual(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
-            ! CALL MPI_iSend(residual(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
-            ! CALL MPI_iRecv(residual(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
-            ! CALL MPI_iSend(residual(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
-            
-            ! CALL MPI_waitall(4,req,stat,ierr)
-
-                ! resid_pc = sum(abs(residual))/((nhx-2)*(nhy-2))
-                ! CALL MPI_Allreduce(resid_pc, resid_pc, 1, MPI_DOUBLE_PRECISION, MPI_SUM, cart_comm, ierr
 
         end DO
         end IF 
