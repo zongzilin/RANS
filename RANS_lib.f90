@@ -119,6 +119,27 @@ MODULE RANS_lib
 
     end SUBROUTINE
 
+    
+    SUBROUTINE MPI_SEND_RECV(Vector,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+		USE MPI
+		IMPLICIT NONE
+		
+		REAL(KIND = 8), dimension(nhy,nhx) :: Vector
+		INTEGER :: nhx, nhy 
+		INTEGER :: ll, lh
+		INTEGER :: cart_comm,tag
+		INTEGER :: left, right,ierr, req(8)
+
+		CALL MPI_iRecv(Vector(1:nhy,ll-1),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(2),ierr)
+        CALL MPI_iSend(Vector(1:nhy,ll),nhy,MPI_DOUBLE_PRECISION,left,tag,cart_comm,req(1),ierr)
+        CALL MPI_iRecv(Vector(1:nhy,lh+1),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(4),ierr)
+        CALL MPI_iSend(Vector(1:nhy,lh),nhy,MPI_DOUBLE_PRECISION,right,tag,cart_comm,req(3),ierr)
+
+	END SUBROUTINE 
+
+end MODULE 
+=======
+
     SUBROUTINE init_mpi(np,neighbours_ranks,cart_comm)
         USE MPI 
 
@@ -147,3 +168,4 @@ MODULE RANS_lib
     end subroutine
 
 end MODULE 
+
