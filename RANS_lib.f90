@@ -118,6 +118,7 @@ MODULE RANS_lib
         ml_out = spread(ml,2,nhx)
 
     end SUBROUTINE
+
     
     SUBROUTINE MPI_SEND_RECV(Vector,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
 		USE MPI
@@ -137,3 +138,34 @@ MODULE RANS_lib
 	END SUBROUTINE 
 
 end MODULE 
+=======
+
+    SUBROUTINE init_mpi(np,neighbours_ranks,cart_comm)
+        USE MPI 
+
+        IMPLICIT NONE 
+
+        INTEGER, INTENT(IN) :: np 
+        INTEGER, INTENT(OUT) :: neighbours_ranks(0:3),cart_comm
+
+        LOGICAL :: reorder, periods(0:1)
+        INTEGER :: dims(0:1), ierr 
+        INTEGER, PARAMETER :: DOWNc = 0
+        INTEGER, PARAMETER :: UPc = 1
+        INTEGER, PARAMETER :: LEFTc = 2
+        INTEGER, PARAMETER :: RIGHTc = 3
+
+        dims = (/0,0/)
+        CALL MPI_Dims_create(np, 1, dims, ierr)
+    
+        ! Creates communicator on cartesian topology
+        reorder = .TRUE.
+        periods = (/.FALSE., .FALSE./)
+        CALL MPI_Cart_create(MPI_COMM_WORLD, 1, dims, periods, reorder, cart_comm, ierr)
+    
+        CALL MPI_Cart_shift(cart_comm, 1, 1, neighbours_ranks(LEFTc), neighbours_ranks(RIGHTc), ierr)
+
+    end subroutine
+
+end MODULE 
+
