@@ -1,6 +1,7 @@
 PROGRAM RANS_MPI
     USE MPI 
     USE RANS_lib 
+    USE omp_lib
 
     IMPLICIT NONE 
 
@@ -9,6 +10,7 @@ PROGRAM RANS_MPI
     ! Domain
     INTEGER :: n, nhx, nhy 
     REAL(KIND = 8) :: x, y, hx, hy
+    REAL(KIND = 8), allocatable :: x_tec(:), y_tec(:)
     REAL(KIND = 8), ALLOCATABLE :: meshY(:)
     REAL(KIND = 8) :: dt 
 
@@ -37,6 +39,10 @@ PROGRAM RANS_MPI
     INTEGER :: ll, lh, lh_prs, ll_prs ! Local Low, Local High, local pressure low/high  
     INTEGER, ALLOCATABLE :: lglel(:) ! Local to GLoblal ELement
 
+    ! Solver timer
+    REAL :: t_prsslv1, t_prsslv2
+    DOUBLE precision :: t_solve1, t_solve2, t2solve
+
     ! Data IO
     INTEGER :: UNIT 
     CHARACTER(LEN = 80) :: filename 
@@ -56,6 +62,9 @@ PROGRAM RANS_MPI
     INTEGER(KIND = 4) :: stat(MPI_STATUS_SIZE, 8), istat(MPI_STATUS_SIZE)
     INTEGER :: left, right, req(8)
     INTEGER, ALLOCATABLE :: displacement(:)
+
+    ! CG initialise
+    REAL(kind = 8), ALLOCATABLE :: aw(:,:), ae(:,:), an(:,:), as(:,:), ap(:,:), b(:,:)
 
     tag = 1
     CALL MPI_Init(ierr)
@@ -108,6 +117,13 @@ PROGRAM RANS_MPI
     ALLOCATE(ml(nhy,nhx))
     ALLOCATE(tmp(nhy,nhx))
 
+    ALLOCATE(ae(nhx,nhy))
+    ALLOCATE(aw(nhx,nhy))
+    ALLOCATE(ap(nhx,nhy))
+    ALLOCATE(an(nhx,nhy))
+    ALLOCATE(as(nhx,nhy))
+    ALLOCATE(b(nhx,nhy))
+
     CALL linspace(-hy/2,0.1+hy/2,hy,meshY)
 
     U = 0.0
@@ -134,14 +150,23 @@ PROGRAM RANS_MPI
 
     call init_mpi(np,neighbours_ranks,cart_comm)
 
+    IF ((np .GT. nhx) .OR. (np .GT. nhy)) then 
+        IF(PID == 0) write(*,*) 'Too little cells for too many PIDs'
+        call MPI_FINALIZE(ierr)
+        return 
+    end IF 
+
     left = neighbours_ranks(2)
     right = neighbours_ranks(3)
 
     CALL mxlen(nhx,nhy,y,meshY,ml) ! Mixing length uniform for all PID 
 
+    t_solve1 = MPI_Wtime()
+
+
     DO WHILE (U_change .GE. U_change_max)
-    !DO ii = 1,3
-         n_count = n_count + 1
+    !DO jj = 1,1
+        n_count = n_count + 1
 
     !     ! ############## MADE THIS SECTION A SUBROUNTINE (CALL IT eddy_visc) ############################!
          DO i = 2,nhy - 1
@@ -191,9 +216,6 @@ PROGRAM RANS_MPI
 
         CALL MPI_waitall(4,req,stat,ierr)
 
-        ! IF((PID == 2) .AND. (ii == 2)) then 
-        !     write(*,*) PID, delYY_u(:,lh), lh, ll 
-        ! end IF 
 
     !     !############################################################################################!
 
@@ -265,7 +287,9 @@ PROGRAM RANS_MPI
         p_count = 0 
         Pc = 0.0
 
+
         IF (PID == 0) then 
+
             div_gl(:,ll:lh) = div(:,ll:lh)
             DO kk = 1, np - 1
                 call Decompose(nhx,kk,np,no_node,lglel)
@@ -291,7 +315,6 @@ PROGRAM RANS_MPI
                         Pc(i,j)= (1/(-2/(hx*hx)-2/(hy*hy))*residual(i,j))*relx_pc+Pc(i,j);
                 end DO
             end DO
-
                 Pc(1,:)=Pc(2,:)
                 Pc(:,1)=Pc(:,2)
                 Pc(:,nhx)=Pc(:,nhx-1)
@@ -336,15 +359,16 @@ PROGRAM RANS_MPI
     
         CALL MPI_waitall(4,req,stat,ierr)  
 
-        
-
         if (PID == 0) then 
                 WRITE(*,'(a40)') '-----------------------------------------'
-                WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count 
+                WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count
                 WRITE(*,'(a20,E20.6)') '# Current Delta U = ', U_change
         end if 
 
     end DO
+
+    t_solve2 = MPI_Wtime()
+    t2solve = t_solve2 - t_solve1
 
     ! Collect data to write to disc
     IF (PID == 0) then 
@@ -363,6 +387,8 @@ PROGRAM RANS_MPI
     call MPI_Bcast(Uout,nhx*nhy,MPI_DOUBLE_PRECISION,0,cart_comm,ierr)
 
     CALL MPI_FINALIZE(ierr)
+
+    CALL write_to_screen(PID,nhx,nhy,n_count,t2solve)
 
     ! Data IO
     filename = 'Uout.dat'

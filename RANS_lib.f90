@@ -137,8 +137,6 @@ MODULE RANS_lib
 
 	END SUBROUTINE 
 
-end MODULE 
-=======
 
     SUBROUTINE init_mpi(np,neighbours_ranks,cart_comm)
         USE MPI 
@@ -166,6 +164,56 @@ end MODULE
         CALL MPI_Cart_shift(cart_comm, 1, 1, neighbours_ranks(LEFTc), neighbours_ranks(RIGHTc), ierr)
 
     end subroutine
+
+    SUBROUTINE write_to_screen(PID,nhx,nhy,n_count,t2solve)
+
+        IMPLICIT NONE 
+
+        INTEGER, INTENT(IN) :: PID, nhy, nhx, n_count
+        REAL(KIND = 8), INTENT(IN) :: t2solve
+
+        if (PID == 0) then 
+            WRITE(*,'(a40)') '-------RUN SUCCESSFUL, DYING......-----------'
+            WRITE(*,'(a20,i20.1)') '# Number of Grids = ', nhx*nhy
+            WRITE(*,'(a20,i20.1)') '# Iteration to converge = ', n_count
+            !WRITE(*,'(a20,E20.6)') ' # Time in pressure solver = ', t_prsslv2 - t_prsslv1
+            WRITE(*,'(a20,f20.6)') '# Time to converge = ', t2solve
+        end if 
+    end subroutine
+
+    subroutine tecplot_2D ( iunit, nx, ny, x, y, T )
+
+        IMPLICIT NONE
+      
+        Integer ( kind = 4 ) iunit,nx,ny,i,j,ierr
+        Real ( kind = 8 ) T(nx,ny)
+        Real ( kind = 8 ) x(nx)
+        Real ( kind = 8 ) y(ny)
+      
+        Character(80), parameter ::  file_name = 'TecPlot2D.tec'
+      
+        open ( unit = iunit, file = file_name, form = 'formatted', access = 'sequential', status = 'replace', iostat = ierr )
+      
+        if ( ierr /= 0 ) then
+          write ( *, '(a)' ) '  Error opening file : tecplot_2D '
+          stop
+        end if
+         
+        write ( iunit, '(a)' ) 'Title="' // trim ( 'Temperature Data' ) // '"'
+        write ( iunit, '(a)' ) 'Variables=' // trim ( '"X","Y","T"' )
+      
+        write ( iunit, '(a)' ) ' '
+        write ( iunit, '(a,i6,a,i6,a)' ) 'Zone I=', ny, ', J=', nx, ', F=POINT'
+       
+        do i = 1, nx
+          do j = 1, ny
+            write ( iunit, '(2f10.3,g15.6)' ) x(i), y(j), T(i,j)
+          end do
+        end do
+        
+        close ( unit = iunit )
+      
+      end subroutine tecplot_2D
 
 end MODULE 
 
