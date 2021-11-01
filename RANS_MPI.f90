@@ -79,16 +79,16 @@ PROGRAM RANS_MPI
     nu = 0.001
     U_in = 60.0
 
-    n = 4 
-    x = 8 ! Domain length
-    y = 0.1
-    hx = x/2**n 
-    hy = y/2**n 
-    nhx = NINT(x/hx) + 2
-    nhy = NINT(y/hy) + 2
-    dt = 0.00001 ! may work for bigger dt 
+    ! n = 4 
+    ! x = 8 ! Domain length
+    ! y = 0.1
+    ! hx = x/2**n 
+    ! hy = y/2**n 
+    ! nhx = NINT(x/hx) + 2
+    !nhy = NINT(y/hy) + 2
+     dt = 0.00001 ! may work for bigger dt 
 
-    call userinp(x,y,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
+    call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
 
     call Decompose(nhx,PID,np,no_node,lglel)
 
