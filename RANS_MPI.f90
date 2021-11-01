@@ -1,6 +1,7 @@
 PROGRAM RANS_MPI
     USE MPI 
     USE RANS_lib 
+    USE readin 
     USE omp_lib
 
     IMPLICIT NONE 
@@ -86,6 +87,8 @@ PROGRAM RANS_MPI
     nhx = NINT(x/hx) + 2
     nhy = NINT(y/hy) + 2
     dt = 0.00001 ! may work for bigger dt 
+
+    call userinp(x,y,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
 
     call Decompose(nhx,PID,np,no_node,lglel)
 
@@ -276,7 +279,6 @@ PROGRAM RANS_MPI
 
         ! MPI send and recv
 		CALL MPI_SEND_RECV(div,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)     
-
 
         CALL MPI_waitall(4,req,stat,ierr)
 
