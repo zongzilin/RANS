@@ -1,0 +1,20 @@
+Mesh{
+	x = 0,8
+	y = 0,0.1
+	nhx = 30
+	nhy = 30
+}
+Properties{
+	nu = 0.001
+	density = 1
+} 
+Solver{
+	U tolerance = 0.0001
+	Pressure tolerance = 0.0001
+}
+linAlg{	
+	None
+}
+TurbulentModel{
+	RANS # MORE TO COME
+}
