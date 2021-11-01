@@ -1,7 +1,7 @@
 module readin 
     contains
 
-    subroutine userinp(x,y,nhx,nhy,nu,density,U_change_max,resid_pc_max)
+    subroutine userinp(x,y,hx,hy,nhx,nhy,nu,density,U_change_max,resid_pc_max)
         implicit none
 
         ! IO variables
@@ -12,8 +12,9 @@ module readin
         logical :: end_of_file = .FALSE. 
     
         ! Mesh variables
-        REAL(KIND = 8), INTENT(OUT) :: x, y 
-        INTEGER, INTENT(OUT) :: nhx, nhy 
+        REAL(KIND = 8), INTENT(OUT) :: x, y ,hx , hy 
+        INTEGER :: nx, ny
+        INTEGER, INTENT(OUT) :: nhx, nhy
     
         ! Physical variables
         REAL(KIND = 8), INTENT(OUT) :: nu, density
@@ -50,13 +51,18 @@ module readin
                 read(buff1,*,iostat=stat) y
             end if        
             if (line_no == 4) then
-                buff1 = buff(6:10)
-                read(buff1,*,iostat=stat) nhx 
+                buff1 = buff(5:10)
+                read(buff1,*,iostat=stat) nx 
+                hx = x/2**nx 
+                nhx = NINT(x/hx) + 2
             end if
             if(line_no == 5) then 
-                buff1 = buff(6:10)
-                read(buff1,*,iostat=stat) nhy
+                buff1 = buff(5:10)
+                read(buff1,*,iostat=stat) ny
+                hy = y/2**ny
+                nhy = NINT(y/hy) + 2
             end if 
+
     
             ! Read physical properties
             if(line_no == 8) then 
@@ -95,6 +101,8 @@ module readin
     
         write(*,*) 'x length: ' , x 
         write(*,*) 'y length: ', y
+        write(*,*) 'hx length: ', hx 
+        write(*,*) 'hy length: ', hy 
         write(*,*) 'number of x grid: ', nhx 
         write(*,*) 'number of y grid: ', nhy
         write(*,*) 'viscousity :', nu 
