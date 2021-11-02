@@ -11,7 +11,7 @@ PROGRAM RANS_MPI
     ! Domain
     INTEGER :: n, nhx, nhy 
     REAL(KIND = 8) :: x, y, hx, hy
-    REAL(KIND = 8), allocatable :: x_tec(:), y_tec(:)
+    REAL(KIND = 8), ALLOCATABLE :: x_tec(:), y_tec(:)
     REAL(KIND = 8), ALLOCATABLE :: meshY(:)
     REAL(KIND = 8) :: dt 
 
@@ -75,82 +75,8 @@ PROGRAM RANS_MPI
 
     ! INITIALISE value 
     ! ###########################  USE SUBROUTINE !!!!!! ###########################!
-    rho = 1
-    nu = 0.001
-    U_in = 60.0
-
-    ! n = 4 
-    ! x = 8 ! Domain length
-    ! y = 0.1
-    ! hx = x/2**n 
-    ! hy = y/2**n 
-    ! nhx = NINT(x/hx) + 2
-    !nhy = NINT(y/hy) + 2
-     dt = 0.00001 ! may work for bigger dt 
-
-    call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
-
-    call Decompose(nhx,PID,np,no_node,lglel)
-
-    ll = lglel(1) 
-    lh = lglel(size(lglel))
-
-    if (PID == 0) then 
-        ll = 2
-    end if
-
-    if (PID == np - 1) lh = lh - 1
-
-    ALLOCATE(U(nhy,nhx))
-    ALLOCATE(Unew(nhy,nhx))
-    ALLOCATE(Uout(nhy,nhx))
-    ALLOCATE(V(nhy,nhx))
-    ALLOCATE(Vnew(nhy,nhx))
-    ALLOCATE(Vout(nhy,nhx))
-    ALLOCATE(P(nhy,nhx))
-    ALLOCATE(Pc(nhy,nhx))
-    ALLOCATE(Pout(nhy,nhx))
-    ALLOCATE(residual(nhy,nhx))
-    ALLOCATE(div(nhy,nhx))
-    ALLOCATE(div_gl(nhy,nhx))
-    ALLOCATE(meshY(nhy))
-    ALLOCATE(delY_u(nhy,nhx))
-    ALLOCATE(delYY_u(nhy,nhx))
-    ALLOCATE(delYX_u(nhy,nhx))
-    ALLOCATE(ml(nhy,nhx))
-    ALLOCATE(tmp(nhy,nhx))
-
-    ALLOCATE(ae(nhx,nhy))
-    ALLOCATE(aw(nhx,nhy))
-    ALLOCATE(ap(nhx,nhy))
-    ALLOCATE(an(nhx,nhy))
-    ALLOCATE(as(nhx,nhy))
-    ALLOCATE(b(nhx,nhy))
-
-    CALL linspace(-hy/2,0.1+hy/2,hy,meshY)
-
-    U = 0.0
-    U(2:nhy - 1,1:2) = U_in 
-    Unew = U
-    V = 0.0
-    Vnew = V 
-    residual = 0.0 
-    div = 0.0
-    delY_u = 0.0
-    delYY_u = 0.0
-    delYX_u = 0.0
-    P = 0.0
-    P(:,1) = 1.0
-    Pc = P 
-
-    U_change = 1
-    U_change_max = 1e-4
-    resid_pc = 1
-    resid_pc_max = 1e-4
-
-    w = 1.9
-    relx_pc = 1.5
-
+    call valInit()
+	! ###########################  USE SUBROUTINE !!!!!! ###########################!
     call init_mpi(np,neighbours_ranks,cart_comm)
 
     IF ((np .GT. nhx) .OR. (np .GT. nhy)) then 
@@ -171,55 +97,8 @@ PROGRAM RANS_MPI
     !DO jj = 1,1
         n_count = n_count + 1
 
-    !     ! ############## MADE THIS SECTION A SUBROUNTINE (CALL IT eddy_visc) ############################!
-         DO i = 2,nhy - 1
-             DO j = ll,lh
-             delY_u(i,j) = (Unew(i+1,j)-Unew(i-1,j))/(2*hy)
-             end DO 
-         end DO
-         delY_u(nhy,:) = 0
-         delY_u(1,2:nhx-1) = 0
-         delY_u(2:nhy,1) = -delY_u(2:nhy,2)
-         delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
-		! MPI send and recv
-		CALL MPI_SEND_RECV(delY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
-
-        CALL MPI_waitall(4,req,stat,ierr)
-
-        tmp = ml**2*ABS(delY_u(:,ll:lh))*delY_u(:,ll:lh)
-        DO i = 2,nhy - 1
-            DO j = ll,lh 
-                tmp(i,j) = ml(i,j)**2*ABS(delY_u(i,j))*delY_u(i,j)
-            end DO
-        end DO
-        ! MPI send and recv
-		CALL MPI_SEND_RECV(tmp,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
-
-        CALL MPI_waitall(4,req,stat,ierr)
-
-        DO i = 2,nhy - 1
-            DO j = ll,lh
-                delYY_u(i,j) = (tmp(i+1,j)-tmp(i-1,j))/(2*hy);
-            end DO
-        end DO
-
-		! MPI send and recv
-		CALL MPI_SEND_RECV(delYY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
-
-        CALL MPI_waitall(4,req,stat,ierr)
-
-        DO i = 2,nhy - 1
-            DO j = ll,lh
-                delYX_u(i,j) = (tmp(i,j+1)-tmp(i,j-1))/(2*hx);
-            end DO
-        end DO
-
-		! MPI send and recv
-		CALL MPI_SEND_RECV(delYX_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
-
-        CALL MPI_waitall(4,req,stat,ierr)
-
-
+     !     ! ############## MADE THIS SECTION A SUBROUNTINE (CALL IT eddy_visc) ############################!
+        call eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag,cart_comm,req)
     !     !############################################################################################!
 
     !     ! U - Velocity solve
@@ -414,6 +293,150 @@ PROGRAM RANS_MPI
         WRITE(UNIT,*) P 
     CLOSE(UNIT)
 
+Contains
+SUBROUTINE AllocateMemory()
+	IMPLICIT NONE
+	ALLOCATE(U(nhy,nhx))
+	ALLOCATE(Unew(nhy,nhx))
+	ALLOCATE(Uout(nhy,nhx))
+	ALLOCATE(V(nhy,nhx))
+	ALLOCATE(Vnew(nhy,nhx))
+	ALLOCATE(Vout(nhy,nhx))
+	ALLOCATE(P(nhy,nhx))
+	ALLOCATE(Pc(nhy,nhx))
+	ALLOCATE(Pout(nhy,nhx))
+	ALLOCATE(residual(nhy,nhx))
+	ALLOCATE(div(nhy,nhx))
+	ALLOCATE(div_gl(nhy,nhx))
+	ALLOCATE(meshY(nhy))
+	ALLOCATE(delY_u(nhy,nhx))
+	ALLOCATE(delYY_u(nhy,nhx))
+	ALLOCATE(delYX_u(nhy,nhx))
+	ALLOCATE(ml(nhy,nhx))
+	ALLOCATE(tmp(nhy,nhx))
+	ALLOCATE(ae(nhx,nhy))
+	ALLOCATE(aw(nhx,nhy))
+	ALLOCATE(ap(nhx,nhy))
+	ALLOCATE(an(nhx,nhy))
+	ALLOCATE(as(nhx,nhy))
+	ALLOCATE(b(nhx,nhy))
+END SUBROUTINE AllocateMemory
 
+SUBROUTINE valInit()
+	IMPLICIT NONE
+	rho = 1
+    nu = 0.001
+    U_in = 60.0
+
+    ! n = 4 
+    ! x = 8 ! Domain length
+    ! y = 0.1
+    ! hx = x/2**n 
+    ! hy = y/2**n 
+    ! nhx = NINT(x/hx) + 2
+    !nhy = NINT(y/hy) + 2
+     dt = 0.00001 ! may work for bigger dt 
+
+    call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
+
+    call Decompose(nhx,PID,np,no_node,lglel)
+
+    ll = lglel(1) 
+    lh = lglel(size(lglel))
+
+    if (PID == 0) then 
+        ll = 2
+    end if
+
+    if (PID == np - 1) lh = lh - 1
+	CALL AllocateMemory()
+	CALL linspace(-hy/2,0.1+hy/2,hy,meshY)
+
+    U = 0.0
+    U(2:nhy - 1,1:2) = U_in 
+    Unew = U
+    V = 0.0
+    Vnew = V 
+    residual = 0.0 
+    div = 0.0
+    delY_u = 0.0
+    delYY_u = 0.0
+    delYX_u = 0.0
+    P = 0.0
+    P(:,1) = 1.0
+    Pc = P 
+
+    U_change = 1
+    U_change_max = 1e-4
+    resid_pc = 1
+    resid_pc_max = 1e-4
+
+    w = 1.9
+    relx_pc = 1.5
+END SUBROUTINE valInit
+
+
+
+SUBROUTINE eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag,cart_comm,req)
+	
+	IMPLICIT NONE
+	INTEGER :: nhx, nhy 
+	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(IN) :: Unew,ml
+	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
+	INTEGER :: i,j
+	INTEGER :: ll, lh
+	INTEGER :: cart_comm,tag
+	INTEGER :: left, right,ierr, req(8)
+	
+	
+         DO i = 2,nhy - 1
+             DO j = ll,lh
+             delY_u(i,j) = (Unew(i+1,j)-Unew(i-1,j))/(2*hy)
+             end DO 
+         end DO
+         delY_u(nhy,:) = 0
+         delY_u(1,2:nhx-1) = 0
+         delY_u(2:nhy,1) = -delY_u(2:nhy,2)
+         delY_u(2:nhy,nhx) = -delY_u(2:nhy,nhx-1)
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+
+        CALL MPI_waitall(4,req,stat,ierr)
+
+        tmp = ml**2*ABS(delY_u(:,ll:lh))*delY_u(:,ll:lh)
+        DO i = 2,nhy - 1
+            DO j = ll,lh 
+                tmp(i,j) = ml(i,j)**2*ABS(delY_u(i,j))*delY_u(i,j)
+            end DO
+        end DO
+        ! MPI send and recv
+		CALL MPI_SEND_RECV(tmp,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+
+        CALL MPI_waitall(4,req,stat,ierr)
+
+        DO i = 2,nhy - 1
+            DO j = ll,lh
+                delYY_u(i,j) = (tmp(i+1,j)-tmp(i-1,j))/(2*hy);
+            end DO
+        end DO
+
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delYY_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+
+        CALL MPI_waitall(4,req,stat,ierr)
+
+        DO i = 2,nhy - 1
+            DO j = ll,lh
+                delYX_u(i,j) = (tmp(i,j+1)-tmp(i,j-1))/(2*hx);
+            end DO
+        end DO
+
+		! MPI send and recv
+		CALL MPI_SEND_RECV(delYX_u,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+
+        CALL MPI_waitall(4,req,stat,ierr)
+
+
+END SUBROUTINE eddy_visc
 
 END PROGRAM RANS_MPI 
