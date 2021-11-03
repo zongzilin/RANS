@@ -314,12 +314,12 @@ SUBROUTINE AllocateMemory()
 	ALLOCATE(delYX_u(nhy,nhx))
 	ALLOCATE(ml(nhy,nhx))
 	ALLOCATE(tmp(nhy,nhx))
-	ALLOCATE(ae(nhx,nhy))
-	ALLOCATE(aw(nhx,nhy))
-	ALLOCATE(ap(nhx,nhy))
-	ALLOCATE(an(nhx,nhy))
-	ALLOCATE(as(nhx,nhy))
-	ALLOCATE(b(nhx,nhy))
+	ALLOCATE(ae(nhx*nhy,nhx*nhy))
+    ALLOCATE(aw(nhx*nhy,nhx*nhy))
+    ALLOCATE(ap(nhx*nhy,nhx*nhy))
+    ALLOCATE(an(nhx*nhy,nhx*nhy))
+    ALLOCATE(as(nhx*nhy,nhx*nhy))
+    ALLOCATE(b(nhx,nhy))
 END SUBROUTINE AllocateMemory
 
 SUBROUTINE valInit()
@@ -381,8 +381,8 @@ SUBROUTINE eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag
 	
 	IMPLICIT NONE
 	INTEGER :: nhx, nhy 
-	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(IN) :: Unew,ml
-	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
+	REAL(KIND = 8),DIMENSION(nhy,nhx), INTENT(IN) :: Unew,ml
+	REAL(KIND = 8),DIMENSION(nhy,nhx), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
 	INTEGER :: i,j
 	INTEGER :: ll, lh
 	INTEGER :: cart_comm,tag
