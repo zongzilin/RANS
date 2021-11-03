@@ -248,8 +248,8 @@ rho = 1
 END SUBROUTINE valInit		
 SUBROUTINE eddy_visc(Unew,delY_u,ml,delYY_u,delYX_u)
 	IMPLICIT NONE
-	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(IN) :: Unew,ml
-	REAL(KIND = 8),DIMENSION(nhx,nhy), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
+	REAL(KIND = 8),DIMENSION(nhy,nhx), INTENT(IN) :: Unew,ml
+	REAL(KIND = 8),DIMENSION(nhy,nhx), INTENT(INOUT) :: delYY_u,delYX_u,delY_u
 	INTEGER :: i,j
 	 DO i = 2,nhy - 1
             DO j = 2,nhx - 1
