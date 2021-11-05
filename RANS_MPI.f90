@@ -19,7 +19,8 @@ PROGRAM RANS_MPI
     REAL(KIND = 8), ALLOCATABLE :: U(:,:),  V(:,:), Unew(:,:), Vnew(:,:), Uout(:,:), Vout(:,:), Pout(:,:)
 
     ! Pressure field
-    REAL(KIND = 8), ALLOCATABLE :: P(:,:), Pc(:,:)
+    REAL(KIND = 8), ALLOCATABLE :: P(:,:), Pc(:,:), trial(:,:), trial_lag(:,:)
+    REAL(KIND = 8) :: prs_coeff
 
     ! Residual/Divergence field 
     REAL(KIND = 8) :: div_sum
@@ -74,9 +75,8 @@ PROGRAM RANS_MPI
 
 
     ! INITIALISE value 
-    ! ###########################  USE SUBROUTINE !!!!!! ###########################!
     call valInit()
-	! ###########################  USE SUBROUTINE !!!!!! ###########################!
+
     call init_mpi(np,neighbours_ranks,cart_comm)
 
     IF ((np .GT. nhx) .OR. (np .GT. nhy)) then 
@@ -97,9 +97,7 @@ PROGRAM RANS_MPI
     !DO jj = 1,1
         n_count = n_count + 1
 
-     !     ! ############## MADE THIS SECTION A SUBROUNTINE (CALL IT eddy_visc) ############################!
-        call eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag,cart_comm,req)
-    !     !############################################################################################!
+    call eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag,cart_comm,req)
 
     !     ! U - Velocity solve
         DO i = 2,nhy - 1
@@ -117,7 +115,7 @@ PROGRAM RANS_MPI
         Unew(1,2:nhx-1)=-Unew(2,2:nhx-1)+2*U_in;
         Unew(2:nhy,1)=-Unew(2:nhy,2);
         Unew(2:nhy,nhx)=-Unew(2:nhy,nhx-1);
-        U_change= MAXVAL(ABS((Unew(:,ll:lh)-U(:,ll:lh))/dt)) ! MPI_Allreduce?
+        U_change= MAXVAL(ABS((Unew(:,ll:lh)-U(:,ll:lh))/dt))
 
         CALL MPI_Allreduce(U_change, U_change, 1, MPI_DOUBLE_PRECISION, MPI_SUM, cart_comm, ierr)
 
@@ -156,21 +154,21 @@ PROGRAM RANS_MPI
             end DO 
         end DO
 
+        !if(PID == 0) write(*,*) div(:,2)
+
         ! MPI send and recv
 		CALL MPI_SEND_RECV(div,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)     
-
         CALL MPI_waitall(4,req,stat,ierr)
-
 
         div_sum = sum(abs(div))/((nhx-2)*(nhy-2))
 
         resid_pc = 1
         p_count = 0 
         Pc = 0.0
+        relx_pc = 1.6
 
 
         IF (PID == 0) then 
-
             div_gl(:,ll:lh) = div(:,ll:lh)
             DO kk = 1, np - 1
                 call Decompose(nhx,kk,np,no_node,lglel)
@@ -185,29 +183,36 @@ PROGRAM RANS_MPI
 
         call MPI_Bcast(div_gl,nhx*nhy,MPI_DOUBLE_PRECISION,0,cart_comm,ierr)
 
-        IF (PID == 0) then 
         DO WHILE ((resid_pc .GT. resid_pc_max) .AND. (p_count .LT. 100)) 
             p_count = p_count + 1
             DO i = 2,nhy - 1
-                DO j = 2, nhx - 1 
-                        residual(i,j) = -1/(hx*hx)*(Pc(i+1,j)-2.*Pc(i,j)+Pc(i-1,j)) &
-                                        -1/(hy*hy)*(Pc(i,j+1)-2.*Pc(i,j)+Pc(i,j-1)) &
-                                        +(1./dt)*div_gl(i,j)
-                        Pc(i,j)= (1/(-2/(hx*hx)-2/(hy*hy))*residual(i,j))*relx_pc+Pc(i,j);
+                DO j = ll,lh 
+                        trial(i,j) = trial_lag(i,j)*(1-relx_pc)+relx_pc*0.25*(div(i,j)/dt & 
+                                    - (trial_lag(i-1,j) + trial_lag(i+1,j))/hx**2 - &
+                                    (trial_lag(i,j-1)+trial_lag(i,j+1))/hy**2)*prs_coeff
                 end DO
             end DO
-                Pc(1,:)=Pc(2,:)
-                Pc(:,1)=Pc(:,2)
-                Pc(:,nhx)=Pc(:,nhx-1)
-                Pc(nhy,:)=0
+            
+            resid_pc = ABS(SUM(ABS(trial(:,ll:lh)))-SUM(ABS(trial_lag(:,ll:lh))))/((nhx-2)*(nhy-2))
+            CALL MPI_Allreduce(resid_pc, resid_pc, 1, MPI_DOUBLE_PRECISION, MPI_SUM, cart_comm, ierr)
+            CALL MPI_SEND_RECV(trial,nhy,nhx,ll,lh,left,right,tag,cart_comm,req) 
+            CALL MPI_SEND_RECV(trial_lag,nhy,nhx,ll,lh,left,right,tag,cart_comm,req) 
 
+            trial_lag = trial
         end DO
-        end IF 
 
-        CALL MPI_Bcast(Pc,nhx*nhy,MPI_DOUBLE_PRECISION,0,cart_comm,ierr)
+        Pc = prs_coeff*trial+trial
+        
+        ! Pressure boundary conditions
+        Pc(1,:) = Pc(2,:)
+        Pc(:,1) = Pc(:,2)
+        Pc(:,nhx)=Pc(:,nhx-1)
+        Pc(nhy,:)=0
 
         ! Update Pressure
         P = P + Pc 
+        !if(PID == 0) write(*,*) trial(:,lh), ll, lh 
+        
 
         DO i = 2,nhy - 1
             DO j = ll,lh
@@ -242,7 +247,7 @@ PROGRAM RANS_MPI
 
         if (PID == 0) then 
                 WRITE(*,'(a40)') '-----------------------------------------'
-                WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count
+                !WRITE(*,'(a20,i20.1)') '# Current Iteration = ', n_count
                 WRITE(*,'(a20,E20.6)') '# Current Delta U = ', U_change
         end if 
 
@@ -320,6 +325,9 @@ SUBROUTINE AllocateMemory()
     ALLOCATE(an(nhx*nhy,nhx*nhy))
     ALLOCATE(as(nhx*nhy,nhx*nhy))
     ALLOCATE(b(nhx,nhy))
+    
+    ALLOCATE(trial(nhy,nhx))
+    ALLOCATE(trial_lag(nhy,nhx))
 END SUBROUTINE AllocateMemory
 
 SUBROUTINE valInit()
@@ -335,7 +343,7 @@ SUBROUTINE valInit()
     ! hy = y/2**n 
     ! nhx = NINT(x/hx) + 2
     !nhy = NINT(y/hy) + 2
-     dt = 0.00001 ! may work for bigger dt 
+    dt = 0.00001 ! may work for bigger dt 
 
     call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
 
@@ -372,9 +380,9 @@ SUBROUTINE valInit()
     resid_pc_max = 1e-4
 
     w = 1.9
-    relx_pc = 1.5
+    prs_coeff = -2/hx**2 - 2/hy**2
+    prs_coeff = 1/prs_coeff
 END SUBROUTINE valInit
-
 
 
 SUBROUTINE eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag,cart_comm,req)
@@ -403,7 +411,7 @@ SUBROUTINE eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag
 
         CALL MPI_waitall(4,req,stat,ierr)
 
-        tmp = ml**2*ABS(delY_u(:,ll:lh))*delY_u(:,ll:lh)
+        !tmp = ml**2*ABS(delY_u(:,ll:lh))*delY_u(:,ll:lh)
         DO i = 2,nhy - 1
             DO j = ll,lh 
                 tmp(i,j) = ml(i,j)**2*ABS(delY_u(i,j))*delY_u(i,j)
@@ -411,6 +419,7 @@ SUBROUTINE eddy_visc(nhx,nhy,Unew,delY_u,ml,delYY_u,delYX_u,ll,lh,left,right,tag
         end DO
         ! MPI send and recv
 		CALL MPI_SEND_RECV(tmp,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
+        if(pid == 0)  tmp(:,1) = -tmp(:,2)
 
         CALL MPI_waitall(4,req,stat,ierr)
 
