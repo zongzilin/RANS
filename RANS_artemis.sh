@@ -5,12 +5,16 @@
 
 #PBS -l walltime=1:00:00
 
+ulimits -s unlimited
+
+source $HOME/.bashrc
+
 cd $PBS_O_WORKDIR
 
 module load gcc
 module load openmpi-gcc/4.1.1
 
-mpirun -n 24 /project/COMPENG/zzon4574 a.out > output
+mpirun -n 24 /project/COMPENG/ > output
 
  exit 0
 
