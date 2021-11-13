@@ -28,6 +28,10 @@ PROGRAM RANS_MPI
     ! Turbulence model (eddy viscosity)
     REAL(KIND = 8), ALLOCATABLE :: delY_u(:,:), delYY_u(:,:), delYX_u(:,:),ml(:,:), tmp(:,:)
 
+    ! CFL 
+    REAL(KIND = 8) :: cfl, cfl_max
+    LOGICAL :: varDt = .FALSE.
+
     ! Iteration/relaxation factor
     INTEGER :: n_count, p_count, i, j, k, ii, jj, kk
     REAL(KIND = 8) :: w, relx_pc
@@ -214,6 +218,13 @@ PROGRAM RANS_MPI
         U=Unew;
         V=Vnew;
 
+        CFL = maxval(abs(U))/hx   
+
+        IF ((CFL .GT. cfl_max) .AND. (varDt .EQv. .TRUE.) )THEN
+            dt =  cfl*hx/maxval(abs(U))
+        END IF
+
+
         ! MPI send and recv
 		CALL MPI_SEND_RECV(Unew,nhy,nhx,ll,lh,left,right,tag,cart_comm,req)
     
@@ -278,6 +289,17 @@ PROGRAM RANS_MPI
         WRITE(UNIT,*) P 
     CLOSE(UNIT)
 
+    filename = 'x.dat'
+    UNIT = 1001 
+    OPEN(UNIT,FILE = filename, FORM = 'FORMATTED', STATUS = 'REPLACE')
+        WRITE(UNIT,*) x  
+    CLOSE(UNIT)
+    filename = 'y.dat'
+    UNIT = 1001 
+    OPEN(UNIT,FILE = filename, FORM = 'FORMATTED', STATUS = 'REPLACE')
+        WRITE(UNIT,*) y
+    CLOSE(UNIT)
+
 Contains
 SUBROUTINE AllocateMemory()
 	IMPLICIT NONE
@@ -310,11 +332,11 @@ SUBROUTINE valInit()
     nu = 0.001
     U_in = 60.0
 
-    n = 4 
+    !n = 8 
     x = 8 ! Domain length
     y = 0.1
-    nhx = 64
-    nhy = 64
+    nhx = 256
+    nhy = 256
     hx = x/(nhx-2)
     hy = y/(nhy-2)
     dt = 0.000001 ! may work for bigger dt 
