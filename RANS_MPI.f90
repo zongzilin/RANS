@@ -1,7 +1,6 @@
 PROGRAM RANS_MPI
     USE MPI 
     USE RANS_lib 
-    USE readin 
     USE omp_lib
 
     IMPLICIT NONE 
@@ -301,8 +300,8 @@ SUBROUTINE AllocateMemory()
 	ALLOCATE(ml(nhy,nhx))
 	ALLOCATE(tmp(nhy,nhx))
 
-    ALLOCATE(trial(nhx,nhy))
-    ALLOCATE(trial_lag(nhx,nhy))
+    ALLOCATE(trial(nhy,nhx))
+    ALLOCATE(trial_lag(nhy,nhx))
 END SUBROUTINE AllocateMemory
 
 SUBROUTINE valInit()
@@ -311,16 +310,16 @@ SUBROUTINE valInit()
     nu = 0.001
     U_in = 60.0
 
-    ! n = 4 
-    ! x = 8 ! Domain length
-    ! y = 0.1
-    ! hx = x/2**n 
-    ! hy = y/2**n 
-    ! nhx = NINT(x/hx) + 2
-    !nhy = NINT(y/hy) + 2
+    n = 4 
+    x = 8 ! Domain length
+    y = 0.1
+    nhx = 64
+    nhy = 64
+    hx = x/(nhx-2)
+    hy = y/(nhy-2)
     dt = 0.000001 ! may work for bigger dt 
 
-    call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
+    !call userinp(x,y,hx,hy,nhx,nhy,nu,rho,U_change_max,resid_pc_max)
 
     call Decompose(nhx,PID,np,no_node,lglel)
 
